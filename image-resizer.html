@@ -144,11 +144,15 @@
 
     /* ─── oversized inputs for primary controls ─────────────────────── */
     .input-lg {
-      padding: 28px 32px;
-      font-size: 38px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
+      padding: 36px 40px;
+      font-size: 56px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
       line-height: 1.05;
+      border-width: 2px;
+    }
+    .input-lg:focus {
+      border-color: var(--accent);
     }
 
     /* ─── small inputs (quality, etc.) ──────────────────────────────── */
@@ -381,13 +385,13 @@
 
           <div class="controls-grid">
             <div class="field">
-              <label for="targetHeightInput" style="font-size: 18px;">Altezza destinazione (cm)</label>
-              <input type="number" id="targetHeightInput" class="input-lg" placeholder="es. 30" min="1" step="1" value="30">
+              <label for="targetHeightInput" style="font-size: 18px; font-weight: 600;">Altezza destinazione (cm)</label>
+              <input type="number" id="targetHeightInput" class="input input-lg" placeholder="es. 30" min="1" step="1" value="30">
             </div>
 
             <div class="field">
-              <label for="dpiInput" style="font-size: 18px;">DPI</label>
-              <input type="number" id="dpiInput" class="input-lg" placeholder="es. 300" min="1" max="2400" step="1" value="300">
+              <label for="dpiInput" style="font-size: 18px; font-weight: 600;">DPI</label>
+              <input type="number" id="dpiInput" class="input input-lg" placeholder="es. 300" min="1" max="2400" step="1" value="300">
             </div>
 
             <div class="field full">
