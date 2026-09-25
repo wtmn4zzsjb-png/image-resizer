@@ -129,18 +129,33 @@
     .field label { font-size: 16px; color: var(--fg); font-weight: 600; }
     .input, .select {
       width: 100%;
-      padding: 24px 28px;
+      padding: 14px 18px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--bg);
       color: var(--fg);
       font-family: var(--font-mono);
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.1;
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
       transition: border-color 0.2s;
       appearance: none;
+    }
+
+    /* ─── oversized inputs for primary controls ─────────────────────── */
+    .input-lg {
+      padding: 28px 32px;
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+    }
+
+    /* ─── small inputs (quality, etc.) ──────────────────────────────── */
+    .input-sm {
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 500;
     }
     .select {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%236b6964' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -366,13 +381,13 @@
 
           <div class="controls-grid">
             <div class="field">
-              <label for="targetHeightInput">Altezza destinazione (cm)</label>
-              <input type="number" id="targetHeightInput" placeholder="es. 30" min="1" step="1" value="30">
+              <label for="targetHeightInput" style="font-size: 18px;">Altezza destinazione (cm)</label>
+              <input type="number" id="targetHeightInput" class="input-lg" placeholder="es. 30" min="1" step="1" value="30">
             </div>
 
             <div class="field">
-              <label for="dpiInput">DPI</label>
-              <input type="number" id="dpiInput" placeholder="es. 300" min="1" max="2400" step="1" value="300">
+              <label for="dpiInput" style="font-size: 18px;">DPI</label>
+              <input type="number" id="dpiInput" class="input-lg" placeholder="es. 300" min="1" max="2400" step="1" value="300">
             </div>
 
             <div class="field full">
@@ -392,7 +407,7 @@
 
             <div class="field">
               <label for="qualityInput">Qualità JPEG (%)</label>
-              <input type="number" id="qualityInput" placeholder="es. 95" min="1" max="100" step="1" value="95" disabled>
+              <input type="number" id="qualityInput" class="input-sm" placeholder="es. 95" min="1" max="100" step="1" value="95" disabled>
             </div>
           </div>
         </div>
