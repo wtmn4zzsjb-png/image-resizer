@@ -548,14 +548,14 @@ function doResizeAndDownload(targetCm, dpi) {
       while (off < buf.length - 2) {
         if (buf[off] === 0xFF && buf[off + 1] === 0xE0) {
           // Found APP0 at off
-          // Skip FF E0 + 2-byte length + "JFIF\0" + 2-byte version = 9 bytes
-          const headerOff = off + 9;
-          if (headerOff + 5 <= buf.length) {
-            buf[headerOff + 0] = 0x01; // unit = inches
-            buf[headerOff + 1] = (dpi >> 8) & 0xFF;
-            buf[headerOff + 2] = dpi & 0xFF;
-            buf[headerOff + 3] = (dpi >> 8) & 0xFF;
-            buf[headerOff + 4] = dpi & 0xFF;
+          // Skip FF E0 + len + "JFIF\0" + version (9 bytes), then unit at +2
+          const unitOff = off + 11;
+          if (unitOff + 4 <= buf.length) {
+            buf[unitOff + 0] = 0x01; // unit = inches
+            buf[unitOff + 1] = (dpi >> 8) & 0xFF; // xDensity high
+            buf[unitOff + 2] = dpi & 0xFF; // xDensity low
+            buf[unitOff + 3] = (dpi >> 8) & 0xFF; // yDensity high
+            buf[unitOff + 4] = dpi & 0xFF; // yDensity low
           }
           break;
         }
