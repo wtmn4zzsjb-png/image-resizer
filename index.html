@@ -409,7 +409,7 @@ downloadBtn.addEventListener('click', () => {
   });
 });
 
-function doResizeAndDownload(targetCm, dpi) {
+async function doResizeAndDownload(targetCm, dpi) {
   const targetH = Math.round(targetCm / 2.54 * dpi);
   const ratio = originalImage.naturalWidth / originalImage.naturalHeight;
   const targetW = Math.round(targetH * ratio);
@@ -435,23 +435,30 @@ function doResizeAndDownload(targetCm, dpi) {
 
   const quality = parseInt(qualityInput.value) / 100;
 
-  canvas.toBlob(blob => {
-    if (fmt === 'png' && blob) {
-      blob = addPngDpi(blob, dpi);
-    }
+  // Use a promise wrapper for canvas.toBlob so we can await
+  const blob = await new Promise(resolve => {
+    canvas.toBlob(resolve, mimeType, fmt === 'jpeg' ? quality : undefined);
+  });
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const baseName = originalFile
-      ? originalFile.name.replace(/\.[^.]+$/, '')
-      : 'image';
-    a.href = url;
-    a.download = `${baseName}_${targetCm}cm_${dpi}dpi${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, mimeType, fmt === 'jpeg' ? quality : undefined);
+  // Properly await the Promise returned by addPngDpi
+  if (fmt === 'png' && blob) {
+    const resolvedBlob = await addPngDpi(blob, dpi);
+    if (resolvedBlob instanceof Blob) {
+      blob = resolvedBlob;
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const baseName = originalFile
+    ? originalFile.name.replace(/\.[^.]+$/, '')
+    : 'image';
+  a.href = url;
+  a.download = `${baseName}_${targetCm}cm_${dpi}dpi${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // Proper PNG pHYs chunk insertion (verified with Python tests)
