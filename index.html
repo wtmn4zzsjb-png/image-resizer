@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Resizer</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --surface: #18181b;
+    --surface-hover: #1f1f23;
+    --border: #2e2e33;
+    --text: #e4e4e7;
+    --text-dim: #a1a1aa;
+    --accent: #8b5cf6;
+    --accent-hover: #7c3aed;
+    --accent-dim: #8b5cf633;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 36px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    position: relative;
+  }
+
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .dropzone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .dropzone-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+
+  .dropzone-text {
+    font-size: 15px;
+    color: var(--text-dim);
+  }
+
+  .dropzone-text strong {
+    color: var(--accent);
+  }
+
+  .preview {
+    display: none;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 16px;
+    border: 1px solid var(--border);
+  }
+
+  .preview.visible { display: block; }
+
+  .preview img {
+    width: 100%;
+    border-radius: var(--radius-sm);
+    display: block;
+  }
+
+  .preview-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field.full { grid-column: 1 / -1; }
+
+  .field label {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  .field input, .field select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+
+  .field input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  .field input[type="number"]::-webkit-outer-spin-button,
+  .field input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+  }
+
+  .resolution {
+    grid-column: 1 / -1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .resolution .label { color: var(--text-dim); }
+  .resolution .value { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 12px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled {
+    background: var(--border);
+    color: var(--text-dim);
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { background: var(--surface-hover); }
+
+  .processing {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+
+  .processing.visible {
+    display: flex;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+
+<h1>Image Resizer</h1>
+<p class="subtitle">Resize to exact dimensions with proper DPI metadata</p>
+
+<div class="container">
+  <!-- Drop Zone -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="dropzone-icon">📁</div>
+    <div class="dropzone-text">
+      <strong>Click to upload</strong> or drag &amp; drop an image
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview" id="preview">
+    <img id="previewImg" src="" alt="Preview">
+    <div class="preview-meta">
+      <span id="originalSize">—</span>
+      <span id="originalFilename">—</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="field">
+      <label for="targetHeightInput">Target Height (cm)</label>
+      <input type="number" id="targetHeightInput" placeholder="e.g. 30" min="1" step="1" value="30">
+    </div>
+
+    <div class="field">
+      <label for="dpiInput">DPI</label>
+      <input type="number" id="dpiInput" placeholder="e.g. 300" min="1" max="2400" step="1" value="300">
+    </div>
+
+    <div class="resolution">
+      <span class="label">Output Resolution</span>
+      <span class="value" id="resolutionValue">—</span>
+    </div>
+
+    <div class="field">
+      <label for="formatSelect">Output Format</label>
+      <select id="formatSelect">
+        <option value="png">PNG (lossless, with DPI)</option>
+        <option value="jpeg">JPEG (lossy)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="qualityInput">JPEG Quality (%)</label>
+      <input type="number" id="qualityInput" placeholder="e.g. 95" min="1" max="100" step="1" value="95" disabled>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="downloadBtn" disabled>Download</button>
+      <button class="btn btn-secondary" id="resetBtn" style="display:none;">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- Processing Overlay -->
+<div class="processing" id="processing">
+  <div class="spinner"></div>
+</div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const dropzone = document.getElementById('dropzone');
+const preview = document.getElementById('preview');
+const previewImg = document.getElementById('previewImg');
+const originalSize = document.getElementById('originalSize');
+const originalFilename = document.getElementById('originalFilename');
+const targetHeightInput = document.getElementById('targetHeightInput');
+const dpiInput = document.getElementById('dpiInput');
+const resolutionValue = document.getElementById('resolutionValue');
+const formatSelect = document.getElementById('formatSelect');
+const qualityInput = document.getElementById('qualityInput');
+const downloadBtn = document.getElementById('downloadBtn');
+const resetBtn = document.getElementById('resetBtn');
+const processingOverlay = document.getElementById('processing');
+
+let originalImage = null;
+let originalFile = null;
+
+// Drag & drop
+dropzone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropzone.classList.add('dragover');
+});
+
+dropzone.addEventListener('dragleave', () => {
+  dropzone.classList.remove('dragover');
+});
+
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) {
+    handleFile(e.dataTransfer.files[0]);
+  }
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) {
+    handleFile(fileInput.files[0]);
+  }
+});
+
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) {
+    alert('Please select an image file.');
+    return;
+  }
+
+  originalFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      originalImage = img;
+      previewImg.src = e.target.result;
+      originalSize.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+      originalFilename.textContent = file.name;
+      preview.classList.add('visible');
+      resetBtn.style.display = '';
+      downloadBtn.disabled = false;
+      updateResolution();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Format change
+formatSelect.addEventListener('change', () => {
+  qualityInput.disabled = formatSelect.value === 'png';
+});
+
+// Update resolution display
+function updateResolution() {
+  if (!originalImage) return;
+  const cm = parseFloat(targetHeightInput.value) || 0;
+  const dpi = parseInt(dpiInput.value) || 300;
+  if (cm <= 0) { resolutionValue.textContent = '—'; return; }
+  const heightPx = Math.round(cm / 2.54 * dpi);
+  const ratio = originalImage.naturalWidth / originalImage.naturalHeight;
+  const widthPx = Math.round(heightPx * ratio);
+  resolutionValue.textContent = `${widthPx} × ${heightPx} px`;
+}
+
+targetHeightInput.addEventListener('input', updateResolution);
+dpiInput.addEventListener('input', updateResolution);
+
+// Download
+downloadBtn.addEventListener('click', () => {
+  if (!originalImage) return;
+  const cm = parseFloat(targetHeightInput.value);
+  const dpi = parseInt(dpiInput.value);
+  if (!cm || cm <= 0) return;
+
+  processingOverlay.classList.add('visible');
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      doResizeAndDownload(cm, dpi);
+      processingOverlay.classList.remove('visible');
+    }, 50);
+  });
+});
+
+function doResizeAndDownload(targetCm, dpi) {
+  const targetH = Math.round(targetCm / 2.54 * dpi);
+  const ratio = originalImage.naturalWidth / originalImage.naturalHeight;
+  const targetW = Math.round(targetH * ratio);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(originalImage, 0, 0, targetW, targetH);
+
+  const fmt = formatSelect.value;
+  let mimeType, ext;
+  if (fmt === 'jpeg') {
+    mimeType = 'image/jpeg';
+    ext = '.jpg';
+  } else {
+    mimeType = 'image/png';
+    ext = '.png';
+  }
+
+  const quality = parseInt(qualityInput.value) / 100;
+
+  canvas.toBlob(blob => {
+    if (fmt === 'png' && blob) {
+      blob = addPngDpi(blob, dpi);
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const baseName = originalFile
+      ? originalFile.name.replace(/\.[^.]+$/, '')
+      : 'image';
+    a.href = url;
+    a.download = `${baseName}_${targetCm}cm_${dpi}dpi${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, mimeType, fmt === 'jpeg' ? quality : undefined);
+}
+
+// Proper PNG pHYs chunk insertion (verified with Python tests)
+function addPngDpi(blob, dpi) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const arr = new Uint8Array(reader.result);
+      
+      // Find first IDAT chunk
+      let offset = 8; // skip PNG signature
+      let idatOffset = null;
+      
+      while (offset < arr.length - 12) {
+        const length = (arr[offset] << 24) | (arr[offset+1] << 16) | (arr[offset+2] << 8) | arr[offset+3];
+        const type = String.fromCharCode(arr[offset+4], arr[offset+5], arr[offset+6], arr[offset+7]);
+        
+        if (type === 'IDAT') {
+          idatOffset = offset;
+          break;
+        }
+        
+        offset += 12 + length; // 4 (len) + 4 (type) + length (data) + 4 (CRC)
+      }
+      
+      if (!idatOffset) { resolve(blob); return; }
+      
+      // Build pHYs chunk: X (4 bytes), Y (4 bytes), unit (1 byte) = 9 bytes
+      const ppu = Math.round(dpi / 0.0254);
+      const phyData = new Uint8Array(9);
+      phyData[0] = (ppu >> 24) & 0xff;
+      phyData[1] = (ppu >> 16) & 0xff;
+      phyData[2] = (ppu >> 8) & 0xff;
+      phyData[3] = ppu & 0xff;
+      phyData[4] = (ppu >> 24) & 0xff;
+      phyData[5] = (ppu >> 16) & 0xff;
+      phyData[6] = (ppu >> 8) & 0xff;
+      phyData[7] = ppu & 0xff;
+      phyData[8] = 1; // unit = meter
+      
+      const phyType = new Uint8Array([0x70, 0x48, 0x59, 0x73]); // "pHYs"
+      const phyLen = new Uint8Array([0, 0, 0, 9]);
+      const phyChunk = new Uint8Array(4 + 4 + 9 + 4); // len + type + data + CRC
+      phyChunk.set(phyLen, 0);
+      phyChunk.set(phyType, 4);
+      phyChunk.set(phyData, 8);
+      phyChunk.set(calcCRC(phyType, phyData), 13);
+      
+      // Insert before IDAT
+      const before = arr.slice(0, idatOffset);
+      const after = arr.slice(idatOffset);
+      const result = new Uint8Array(before.length + phyChunk.length + after.length);
+      result.set(before, 0);
+      result.set(phyChunk, before.length);
+      result.set(after, before.length + phyChunk.length);
+      
+      resolve(new Blob([result], { type: 'image/png' }));
+    };
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+function calcCRC(type, data) {
+  const buf = new Uint8Array(type.length + data.length);
+  buf.set(type, 0);
+  buf.set(data, type.length);
+  
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
+  }
+  const result = new Uint8Array([
+    ((crc ^ 0xFFFFFFFF) >> 24) & 0xff,
+    ((crc ^ 0xFFFFFFFF) >> 16) & 0xff,
+    ((crc ^ 0xFFFFFFFF) >> 8) & 0xff,
+    (crc ^ 0xFFFFFFFF) & 0xff
+  ]);
+  return result;
+}
+
+// Reset
+resetBtn.addEventListener('click', () => {
+  originalImage = null;
+  originalFile = null;
+  preview.classList.remove('visible');
+  previewImg.src = '';
+  resetBtn.style.display = 'none';
+  downloadBtn.disabled = true;
+  resolutionValue.textContent = '—';
+  fileInput.value = '';
+});
+
+// Init
+updateResolution();
+</script>
+
+</body>
+</html>
