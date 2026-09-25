@@ -399,17 +399,14 @@ downloadBtn.addEventListener('click', () => {
   const dpi = parseInt(dpiInput.value);
   if (!cm || cm <= 0) return;
 
-  processingOverlay.classList.add('visible');
-
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      doResizeAndDownload(cm, dpi);
-      processingOverlay.classList.remove('visible');
-    }, 50);
-  });
+  try {
+    doResizeAndDownload(cm, dpi);
+  } catch (err) {
+    console.error('Download failed:', err);
+  }
 });
 
-async function doResizeAndDownload(targetCm, dpi) {
+function doResizeAndDownload(targetCm, dpi) {
   const targetH = Math.round(targetCm / 2.54 * dpi);
   const ratio = originalImage.naturalWidth / originalImage.naturalHeight;
   const targetW = Math.round(targetH * ratio);
@@ -435,111 +432,19 @@ async function doResizeAndDownload(targetCm, dpi) {
 
   const quality = parseInt(qualityInput.value) / 100;
 
-  // Use a promise wrapper for canvas.toBlob so we can await
-  const blob = await new Promise(resolve => {
-    canvas.toBlob(resolve, mimeType, fmt === 'jpeg' ? quality : undefined);
-  });
+  const dataUrl = canvas.toDataURL(mimeType, fmt === 'jpeg' ? quality : undefined);
 
-  // Properly await the Promise returned by addPngDpi
-  if (fmt === 'png' && blob) {
-    const resolvedBlob = await addPngDpi(blob, dpi);
-    if (resolvedBlob instanceof Blob) {
-      blob = resolvedBlob;
-    }
-  }
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
   const baseName = originalFile
     ? originalFile.name.replace(/\.[^.]+$/, '')
     : 'image';
-  a.href = url;
-  a.download = `${baseName}_${targetCm}cm_${dpi}dpi${ext}`;
+  const filename = `${baseName}_${targetCm}cm_${dpi}dpi${ext}`;
+
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// Proper PNG pHYs chunk insertion (verified with Python tests)
-function addPngDpi(blob, dpi) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const arr = new Uint8Array(reader.result);
-      
-      // Find first IDAT chunk
-      let offset = 8; // skip PNG signature
-      let idatOffset = null;
-      
-      while (offset < arr.length - 12) {
-        const length = (arr[offset] << 24) | (arr[offset+1] << 16) | (arr[offset+2] << 8) | arr[offset+3];
-        const type = String.fromCharCode(arr[offset+4], arr[offset+5], arr[offset+6], arr[offset+7]);
-        
-        if (type === 'IDAT') {
-          idatOffset = offset;
-          break;
-        }
-        
-        offset += 12 + length; // 4 (len) + 4 (type) + length (data) + 4 (CRC)
-      }
-      
-      if (!idatOffset) { resolve(blob); return; }
-      
-      // Build pHYs chunk: X (4 bytes), Y (4 bytes), unit (1 byte) = 9 bytes
-      const ppu = Math.round(dpi / 0.0254);
-      const phyData = new Uint8Array(9);
-      phyData[0] = (ppu >> 24) & 0xff;
-      phyData[1] = (ppu >> 16) & 0xff;
-      phyData[2] = (ppu >> 8) & 0xff;
-      phyData[3] = ppu & 0xff;
-      phyData[4] = (ppu >> 24) & 0xff;
-      phyData[5] = (ppu >> 16) & 0xff;
-      phyData[6] = (ppu >> 8) & 0xff;
-      phyData[7] = ppu & 0xff;
-      phyData[8] = 1; // unit = meter
-      
-      const phyType = new Uint8Array([0x70, 0x48, 0x59, 0x73]); // "pHYs"
-      const phyLen = new Uint8Array([0, 0, 0, 9]);
-      const phyChunk = new Uint8Array(4 + 4 + 9 + 4); // len + type + data + CRC
-      phyChunk.set(phyLen, 0);
-      phyChunk.set(phyType, 4);
-      phyChunk.set(phyData, 8);
-      phyChunk.set(calcCRC(phyType, phyData), 13);
-      
-      // Insert before IDAT
-      const before = arr.slice(0, idatOffset);
-      const after = arr.slice(idatOffset);
-      const result = new Uint8Array(before.length + phyChunk.length + after.length);
-      result.set(before, 0);
-      result.set(phyChunk, before.length);
-      result.set(after, before.length + phyChunk.length);
-      
-      resolve(new Blob([result], { type: 'image/png' }));
-    };
-    reader.readAsArrayBuffer(blob);
-  });
-}
-
-function calcCRC(type, data) {
-  const buf = new Uint8Array(type.length + data.length);
-  buf.set(type, 0);
-  buf.set(data, type.length);
-  
-  let crc = 0xFFFFFFFF;
-  for (let i = 0; i < buf.length; i++) {
-    crc ^= buf[i];
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
-    }
-  }
-  const result = new Uint8Array([
-    ((crc ^ 0xFFFFFFFF) >> 24) & 0xff,
-    ((crc ^ 0xFFFFFFFF) >> 16) & 0xff,
-    ((crc ^ 0xFFFFFFFF) >> 8) & 0xff,
-    (crc ^ 0xFFFFFFFF) & 0xff
-  ]);
-  return result;
 }
 
 // Reset
