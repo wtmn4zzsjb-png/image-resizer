@@ -1,285 +1,431 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<!--
+  Image Resizer — UI overhaul
+  Built from web-prototype seed, adapted as a functional tool interface.
+  Japanese layout: upload → preview/resolution → controls → action
+-->
+<html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Image Resizer</title>
-<style>
-  :root {
-    --bg: #0e0e10;
-    --surface: #18181b;
-    --surface-hover: #1f1f23;
-    --border: #2e2e33;
-    --text: #e4e4e7;
-    --text-dim: #a1a1aa;
-    --accent: #8b5cf6;
-    --accent-hover: #7c3aed;
-    --accent-dim: #8b5cf633;
-    --radius: 12px;
-    --radius-sm: 8px;
-  }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ridimensiona Immagini</title>
+  <style>
+    /* ─── tokens ───────────────────────────────────────────────────────── */
+    :root {
+      --bg:      #f5f0eb;
+      --surface: #ffffff;
+      --fg:      #1a1916;
+      --muted:   #6b6964;
+      --border:  #e0dbd5;
+      --accent:  #c96442;
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+      --accent-soft: color-mix(in oklch, var(--accent) 14%, transparent);
+      --fg-soft:     color-mix(in oklch, var(--fg) 6%, transparent);
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 40px 20px;
-  }
+      --font-display: 'Iowan Old Style', 'Charter', Georgia, 'Times New Roman', serif;
+      --font-body:    -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono:    ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
 
-  h1 {
-    font-size: 28px;
-    font-weight: 600;
-    margin-bottom: 8px;
-    letter-spacing: -0.5px;
-  }
+      --fs-h1: clamp(32px, 4vw, 44px);
+      --fs-h2: 22px;
+      --fs-lead: 17px;
+      --fs-body: 16px;
+      --fs-meta: 13px;
 
-  .subtitle {
-    color: var(--text-dim);
-    font-size: 14px;
-    margin-bottom: 36px;
-  }
+      --gap-xs: 8px;
+      --gap-sm: 12px;
+      --gap-md: 20px;
+      --gap-lg: 32px;
+      --gap-xl: 48px;
 
-  .container {
-    width: 100%;
-    max-width: 640px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
+      --container: 960px;
+      --gutter: 24px;
 
-  .dropzone {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 48px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    background: var(--surface);
-    position: relative;
-  }
+      --radius: 10px;
+      --radius-lg: 16px;
+    }
 
-  .dropzone:hover, .dropzone.dragover {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
+    /* ─── reset & base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--fs-body);
+      line-height: 1.55;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+    h1, h2, h3, h4 { text-wrap: balance; }
 
-  .dropzone input {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
+    /* ─── layout primitives ─────────────────────────────────────────── */
+    .container {
+      max-width: var(--container);
+      margin-inline: auto;
+      padding-inline: var(--gutter);
+    }
+    .section { padding-block: clamp(40px, 6vw, 72px); }
+    .stack { display: flex; flex-direction: column; }
+    .stack > * + * { margin-top: var(--gap-md); }
+    .row { display: flex; align-items: center; gap: var(--gap-md); }
+    .row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-md); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--gap-lg); }
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
 
-  .dropzone-icon {
-    font-size: 40px;
-    margin-bottom: 12px;
-  }
+    /* ─── type ──────────────────────────────────────────────────────── */
+    .h1, h1 { font-family: var(--font-display); font-size: var(--fs-h1); line-height: 1.08; letter-spacing: -0.02em; margin: 0; }
+    .h2, h2 { font-size: var(--fs-h2); font-weight: 600; line-height: 1.3; letter-spacing: -0.005em; margin: 0; }
+    .lead   { font-size: var(--fs-lead); line-height: 1.55; color: var(--muted); max-width: 56ch; margin: 0; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 var(--gap-md);
+    }
+    .meta { font-family: var(--font-mono); font-size: var(--fs-meta); color: var(--muted); }
+    .num  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-  .dropzone-text {
-    font-size: 15px;
-    color: var(--text-dim);
-  }
+    /* ─── buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 24px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 88%, black); }
+    .btn-primary:disabled { background: var(--border); border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+    .btn-secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--fg); }
+    .btn-sm { padding: 8px 16px; font-size: 13px; }
 
-  .dropzone-text strong {
-    color: var(--accent);
-  }
+    /* ─── card / surface ────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+    }
+    .card-flat { background: transparent; border: 0; padding: 0; }
 
-  .preview {
-    display: none;
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 16px;
-    border: 1px solid var(--border);
-  }
+    /* ─── form field ────────────────────────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .input, .select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--fg);
+      font: inherit;
+      font-size: 15px;
+      transition: border-color 0.2s;
+      appearance: none;
+    }
+    .select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%236b6964' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+    .input:focus, .select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    .input[type="number"]::-webkit-outer-spin-button,
+    .input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+    }
 
-  .preview.visible { display: block; }
+    /* ─── drop zone ─────────────────────────────────────────────────── */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-lg);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: var(--surface);
+      position: relative;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .dropzone input {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .dropzone-icon {
+      width: 48px; height: 48px; margin: 0 auto 16px;
+      display: grid; place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      background: var(--bg);
+    }
+    .dropzone-icon svg { width: 22px; height: 22px; }
+    .dropzone-text { font-size: 15px; color: var(--muted); }
+    .dropzone-text strong { color: var(--accent); font-weight: 500; }
 
-  .preview img {
-    width: 100%;
-    border-radius: var(--radius-sm);
-    display: block;
-  }
+    /* ─── preview card ──────────────────────────────────────────────── */
+    .preview-card {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .preview-card.visible { display: block; }
+    .preview-image-wrap {
+      padding: 16px 16px 0;
+      display: grid;
+      place-items: center;
+    }
+    .preview-image-wrap img {
+      max-width: 100%;
+      max-height: 320px;
+      height: auto;
+      display: block;
+      border-radius: var(--radius);
+      object-fit: contain;
+      justify-self: center;
+    }
+    .preview-meta {
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
 
-  .preview-meta {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 12px;
-    font-size: 13px;
-    color: var(--text-dim);
-  }
+    /* ─── resolution display ────────────────────────────────────────── */
+    .resolution-banner {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .resolution-banner .label { color: var(--muted); font-size: 13px; font-weight: 500; }
+    .resolution-banner .value { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 
-  .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
+    /* ─── controls section ──────────────────────────────────────────── */
+    .controls-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+    }
+    .controls-section .controls-header {
+      display: flex;
+      align-items: baseline;
+      gap: var(--gap-sm);
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .controls-section .controls-header h2 { font-size: 17px; font-weight: 600; }
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .controls-grid .field.full { grid-column: 1 / -1; }
 
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
+    /* ─── workflow steps ────────────────────────────────────────────── */
+    .workflow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0 24px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .workflow-step {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      opacity: 0.4;
+      transition: opacity 0.2s;
+    }
+    .workflow-step.active { opacity: 1; color: var(--fg); }
+    .workflow-step.done { opacity: 0.6; color: var(--accent); }
+    .workflow-arrow { color: var(--border); font-size: 14px; }
 
-  .field.full { grid-column: 1 / -1; }
+    /* ─── footer ────────────────────────────────────────────────────── */
+    .pagefoot {
+      padding-block: 32px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    .pagefoot .meta { font-size: 12px; }
 
-  .field label {
-    font-size: 13px;
-    color: var(--text-dim);
-    font-weight: 500;
-  }
+    /* ─── spinner ───────────────────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-  .field input, .field select {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 10px 14px;
-    color: var(--text);
-    font-size: 15px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .field input:focus, .field select:focus {
-    border-color: var(--accent);
-  }
-
-  .field input[type="number"] {
-    -moz-appearance: textfield;
-  }
-
-  .field input[type="number"]::-webkit-outer-spin-button,
-  .field input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-  }
-
-  .resolution {
-    grid-column: 1 / -1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 14px 16px;
-    font-size: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .resolution .label { color: var(--text-dim); }
-  .resolution .value { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
-
-  .actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 4px;
-  }
-
-  .btn {
-    flex: 1;
-    padding: 12px 20px;
-    border-radius: var(--radius-sm);
-    border: none;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: white;
-  }
-
-  .btn-primary:hover { background: var(--accent-hover); }
-  .btn-primary:disabled {
-    background: var(--border);
-    color: var(--text-dim);
-    cursor: not-allowed;
-  }
-
-  .btn-secondary {
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
-
-  .btn-secondary:hover { background: var(--surface-hover); }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-</style>
+    /* ─── mobile ────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .controls-grid { grid-template-columns: 1fr; }
+      .resolution-banner { flex-direction: column; gap: 4px; align-items: flex-start; }
+      .preview-meta { flex-direction: column; gap: 4px; }
+    }
+  </style>
 </head>
 <body>
 
-<h1>Image Resizer</h1>
-<p class="subtitle">Resize to exact dimensions with proper DPI metadata</p>
-
-<div class="container">
-  <!-- Drop Zone -->
-  <div class="dropzone" id="dropzone">
-    <input type="file" id="fileInput" accept="image/*">
-    <div class="dropzone-icon">📁</div>
-    <div class="dropzone-text">
-      <strong>Click to upload</strong> or drag &amp; drop an image
+  <!-- Workflow indicator -->
+  <div style="padding-top: 32px;">
+    <div class="container">
+      <div class="workflow" id="workflow">
+        <span class="workflow-step active" id="step1">① Carica</span>
+        <span class="workflow-arrow">→</span>
+        <span class="workflow-step" id="step2">② Configura</span>
+        <span class="workflow-arrow">→</span>
+        <span class="workflow-step" id="step3">③ Scarica</span>
+      </div>
     </div>
   </div>
 
-  <!-- Preview -->
-  <div class="preview" id="preview">
-    <img id="previewImg" src="" alt="Preview">
-    <div class="preview-meta">
-      <span id="originalSize">—</span>
-      <span id="originalFilename">—</span>
+  <!-- Title -->
+  <div style="text-align: center; padding: 0 0 8px;">
+    <div class="container">
+      <h1>Ridimensiona Immagini</h1>
+      <p class="lead" style="margin: 10px auto 0;">Ridimensiona le tue immagini con risoluzione e metadati DPI precisi. Tutto nel browser, nessun upload.</p>
     </div>
   </div>
 
-  <!-- Controls -->
-  <div class="controls">
-    <div class="field">
-      <label for="targetHeightInput">Target Height (cm)</label>
-      <input type="number" id="targetHeightInput" placeholder="e.g. 30" min="1" step="1" value="30">
-    </div>
+  <main style="padding-bottom: 64px;">
+    <div class="container" style="max-width: 680px;">
 
-    <div class="field">
-      <label for="dpiInput">DPI</label>
-      <input type="number" id="dpiInput" placeholder="e.g. 300" min="1" max="2400" step="1" value="300">
-    </div>
+      <!-- Drop Zone -->
+      <section id="upload-section" data-od-id="upload">
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept="image/*">
+          <div class="dropzone-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <div class="dropzone-text">
+            <strong>Clicca per caricare</strong> o trascina un'immagine<br>
+            <span style="font-size: 13px; opacity: 0.7;">PNG, JPG, WebP — massimo 50 MB</span>
+          </div>
+        </div>
+      </section>
 
-    <div class="resolution">
-      <span class="label">Output Resolution</span>
-      <span class="value" id="resolutionValue">—</span>
-    </div>
+      <!-- Preview Card -->
+      <section id="preview-section" style="display: none;">
+        <div class="preview-card visible">
+          <div class="preview-image-wrap">
+            <img id="previewImg" src="" alt="Anteprima immagine">
+          </div>
+          <div class="preview-meta">
+            <span id="originalSize">—</span>
+            <span id="originalFilename">—</span>
+          </div>
+        </div>
+      </section>
 
-    <div class="field">
-      <label for="formatSelect">Output Format</label>
-      <select id="formatSelect">
-        <option value="png">PNG (lossless, with DPI)</option>
-        <option value="jpeg">JPEG (lossy)</option>
-      </select>
-    </div>
+      <!-- Controls -->
+      <section id="controls-section" style="display: none;">
+        <div class="controls-section">
+          <div class="controls-header">
+            <h2>Impostazioni</h2>
+          </div>
 
-    <div class="field">
-      <label for="qualityInput">JPEG Quality (%)</label>
-      <input type="number" id="qualityInput" placeholder="e.g. 95" min="1" max="100" step="1" value="95" disabled>
-    </div>
+          <div class="controls-grid">
+            <div class="field">
+              <label for="targetHeightInput">Altezza destinazione (cm)</label>
+              <input type="number" id="targetHeightInput" placeholder="es. 30" min="1" step="1" value="30">
+            </div>
 
-    <div class="actions">
-      <button class="btn btn-primary" id="downloadBtn" disabled>Download</button>
-      <button class="btn btn-secondary" id="resetBtn" style="display:none;">Reset</button>
+            <div class="field">
+              <label for="dpiInput">DPI</label>
+              <input type="number" id="dpiInput" placeholder="es. 300" min="1" max="2400" step="1" value="300">
+            </div>
+
+            <div class="field full">
+              <div class="resolution-banner">
+                <span class="label">Risoluzione di uscita</span>
+                <span class="value num" id="resolutionValue">—</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="formatSelect">Formato di uscita</label>
+              <select id="formatSelect" class="select">
+                <option value="png">PNG (senza perdita, con DPI)</option>
+                <option value="jpeg">JPEG (con perdita)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="qualityInput">Qualità JPEG (%)</label>
+              <input type="number" id="qualityInput" placeholder="es. 95" min="1" max="100" step="1" value="95" disabled>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Action buttons -->
+      <section id="actions-section" style="display: none; margin-top: 24px;">
+        <div class="stack">
+          <button class="btn btn-primary" id="downloadBtn" disabled style="width: 100%;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Scarica
+          </button>
+          <button class="btn btn-secondary" id="resetBtn" style="width: 100%;">
+            Ricomincia
+          </button>
+        </div>
+      </section>
+
     </div>
-  </div>
-</div>
+  </main>
+
+  <footer class="pagefoot">
+    <div class="container">
+      <p class="meta">Elaborazione locale — le tue immagini non lasciano mai il browser.</p>
+    </div>
+  </footer>
 
 <script>
 const fileInput = document.getElementById('fileInput');
 const dropzone = document.getElementById('dropzone');
-const preview = document.getElementById('preview');
+const previewSection = document.getElementById('preview-section');
+const preview = document.getElementById('preview-section');
 const previewImg = document.getElementById('previewImg');
 const originalSize = document.getElementById('originalSize');
 const originalFilename = document.getElementById('originalFilename');
@@ -290,9 +436,21 @@ const formatSelect = document.getElementById('formatSelect');
 const qualityInput = document.getElementById('qualityInput');
 const downloadBtn = document.getElementById('downloadBtn');
 const resetBtn = document.getElementById('resetBtn');
+const controlsSection = document.getElementById('controls-section');
+const actionsSection = document.getElementById('actions-section');
+const uploadSection = document.getElementById('upload-section');
 
 let originalImage = null;
 let originalFile = null;
+
+// Workflow step management
+function updateWorkflow(step) {
+  document.getElementById('step1').classList.toggle('active', step >= 1);
+  document.getElementById('step1').classList.toggle('done', step > 1);
+  document.getElementById('step2').classList.toggle('active', step >= 2);
+  document.getElementById('step2').classList.toggle('done', step > 2);
+  document.getElementById('step3').classList.toggle('active', step === 3);
+}
 
 // Drag & drop
 dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
@@ -307,7 +465,7 @@ fileInput.addEventListener('change', () => {
 });
 
 function handleFile(file) {
-  if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+  if (!file.type.startsWith('image/')) { alert('Seleziona un file immagine.'); return; }
   originalFile = file;
   const reader = new FileReader();
   reader.onload = e => {
@@ -317,9 +475,12 @@ function handleFile(file) {
       previewImg.src = e.target.result;
       originalSize.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
       originalFilename.textContent = file.name;
-      preview.classList.add('visible');
-      resetBtn.style.display = '';
+      previewSection.classList.add('visible');
+      controlsSection.style.display = '';
+      actionsSection.style.display = '';
+      uploadSection.style.display = 'none';
       downloadBtn.disabled = false;
+      updateWorkflow(2);
       updateResolution();
     };
     img.src = e.target.result;
@@ -386,7 +547,7 @@ function doResizeAndDownload(targetCm, dpi) {
     dataUrl = embedDpiInPng(dataUrl, dpi);
   }
 
-  const baseName = originalFile ? originalFile.name.replace(/\.[^.]+$/, '') : 'image';
+  const baseName = originalFile ? originalFile.name.replace(/\.[^.]+$/, '') : 'immagine';
   const filename = `${baseName}_${targetCm}cm_${dpi}dpi${ext}`;
 
   const a = document.createElement('a');
@@ -395,11 +556,11 @@ function doResizeAndDownload(targetCm, dpi) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  updateWorkflow(3);
 }
 
-// Synchronous PNG DPI embedding — all done with data URL base64, no async
+// Synchronous PNG DPI embedding
 function embedDpiInPng(dataUrl, dpi) {
-  // Parse the base64 data from the data URL
   const base64Data = dataUrl.split(',')[1];
   const binaryData = atob(base64Data);
   const arr = new Uint8Array(binaryData.length);
@@ -407,8 +568,7 @@ function embedDpiInPng(dataUrl, dpi) {
     arr[i] = binaryData.charCodeAt(i);
   }
 
-  // Find first IDAT chunk
-  let offset = 8; // skip PNG signature
+  let offset = 8;
   let idatOffset = null;
 
   while (offset < arr.length - 12) {
@@ -421,35 +581,28 @@ function embedDpiInPng(dataUrl, dpi) {
     offset += 12 + length;
   }
 
-  if (!idatOffset) return dataUrl; // can't find IDAT, return original
+  if (!idatOffset) return dataUrl;
 
-  // Build pHYs chunk (9 bytes: X uint32, Y uint32, unit uint8)
   const ppu = Math.round(dpi / 0.0254);
-  const phyChunk = new Uint8Array(4 + 4 + 9 + 4); // len + type + data + CRC
-  phyChunk[0] = 0; phyChunk[1] = 0; phyChunk[2] = 0; phyChunk[3] = 9; // length = 9
-  phyChunk[4] = 0x70; phyChunk[5] = 0x48; phyChunk[6] = 0x59; phyChunk[7] = 0x73; // "pHYs"
-  // X (pixels per meter)
+  const phyChunk = new Uint8Array(4 + 4 + 9 + 4);
+  phyChunk[0] = 0; phyChunk[1] = 0; phyChunk[2] = 0; phyChunk[3] = 9;
+  phyChunk[4] = 0x70; phyChunk[5] = 0x48; phyChunk[6] = 0x59; phyChunk[7] = 0x73;
   phyChunk[8] = (ppu >> 24) & 0xff; phyChunk[9] = (ppu >> 16) & 0xff;
   phyChunk[10] = (ppu >> 8) & 0xff; phyChunk[11] = ppu & 0xff;
-  // Y (pixels per meter)
   phyChunk[12] = (ppu >> 24) & 0xff; phyChunk[13] = (ppu >> 16) & 0xff;
   phyChunk[14] = (ppu >> 8) & 0xff; phyChunk[15] = ppu & 0xff;
-  // unit = meter
   phyChunk[16] = 1;
-  // CRC
   const crc = calcCRCUint8(phyChunk, 4, 13);
   phyChunk[17] = ((crc ^ 0xFFFFFFFF) >> 24) & 0xff;
   phyChunk[18] = ((crc ^ 0xFFFFFFFF) >> 16) & 0xff;
   phyChunk[19] = ((crc ^ 0xFFFFFFFF) >> 8) & 0xff;
   phyChunk[20] = (crc ^ 0xFFFFFFFF) & 0xff;
 
-  // Insert pHYs before IDAT
   const result = new Uint8Array((idatOffset) + phyChunk.length + (arr.length - idatOffset));
   result.set(arr.slice(0, idatOffset), 0);
   result.set(phyChunk, idatOffset);
   result.set(arr.slice(idatOffset), idatOffset + phyChunk.length);
 
-  // Convert back to base64 data URL
   let binary = '';
   for (let i = 0; i < result.length; i++) {
     binary += String.fromCharCode(result[i]);
@@ -473,15 +626,18 @@ function calcCRCUint8(buf, start, len) {
 resetBtn.addEventListener('click', () => {
   originalImage = null;
   originalFile = null;
-  preview.classList.remove('visible');
+  previewSection.classList.remove('visible');
   previewImg.src = '';
-  resetBtn.style.display = 'none';
+  controlsSection.style.display = 'none';
+  actionsSection.style.display = 'none';
+  uploadSection.style.display = '';
   downloadBtn.disabled = true;
   resolutionValue.textContent = '—';
   fileInput.value = '';
+  updateWorkflow(1);
 });
 
-updateResolution();
+updateWorkflow(1);
 </script>
 
 </body>
