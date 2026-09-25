@@ -210,29 +210,6 @@
 
   .btn-secondary:hover { background: var(--surface-hover); }
 
-  .processing {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-  }
-
-  .processing.visible {
-    display: flex;
-  }
-
-  .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
@@ -299,11 +276,6 @@
   </div>
 </div>
 
-<!-- Processing Overlay -->
-<div class="processing" id="processing">
-  <div class="spinner"></div>
-</div>
-
 <script>
 const fileInput = document.getElementById('fileInput');
 const dropzone = document.getElementById('dropzone');
@@ -318,41 +290,24 @@ const formatSelect = document.getElementById('formatSelect');
 const qualityInput = document.getElementById('qualityInput');
 const downloadBtn = document.getElementById('downloadBtn');
 const resetBtn = document.getElementById('resetBtn');
-const processingOverlay = document.getElementById('processing');
 
 let originalImage = null;
 let originalFile = null;
 
 // Drag & drop
-dropzone.addEventListener('dragover', e => {
-  e.preventDefault();
-  dropzone.classList.add('dragover');
-});
-
-dropzone.addEventListener('dragleave', () => {
-  dropzone.classList.remove('dragover');
-});
-
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => { dropzone.classList.remove('dragover'); });
 dropzone.addEventListener('drop', e => {
   e.preventDefault();
   dropzone.classList.remove('dragover');
-  if (e.dataTransfer.files.length) {
-    handleFile(e.dataTransfer.files[0]);
-  }
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
 });
-
 fileInput.addEventListener('change', () => {
-  if (fileInput.files.length) {
-    handleFile(fileInput.files[0]);
-  }
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
 });
 
 function handleFile(file) {
-  if (!file.type.startsWith('image/')) {
-    alert('Please select an image file.');
-    return;
-  }
-
+  if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
   originalFile = file;
   const reader = new FileReader();
   reader.onload = e => {
@@ -372,12 +327,10 @@ function handleFile(file) {
   reader.readAsDataURL(file);
 }
 
-// Format change
 formatSelect.addEventListener('change', () => {
   qualityInput.disabled = formatSelect.value === 'png';
 });
 
-// Update resolution display
 function updateResolution() {
   if (!originalImage) return;
   const cm = parseFloat(targetHeightInput.value) || 0;
@@ -398,12 +351,7 @@ downloadBtn.addEventListener('click', () => {
   const cm = parseFloat(targetHeightInput.value);
   const dpi = parseInt(dpiInput.value);
   if (!cm || cm <= 0) return;
-
-  try {
-    doResizeAndDownload(cm, dpi);
-  } catch (err) {
-    console.error('Download failed:', err);
-  }
+  doResizeAndDownload(cm, dpi);
 });
 
 function doResizeAndDownload(targetCm, dpi) {
@@ -431,12 +379,14 @@ function doResizeAndDownload(targetCm, dpi) {
   }
 
   const quality = parseInt(qualityInput.value) / 100;
+  let dataUrl = canvas.toDataURL(mimeType, fmt === 'jpeg' ? quality : undefined);
 
-  const dataUrl = canvas.toDataURL(mimeType, fmt === 'jpeg' ? quality : undefined);
+  // For PNG, embed DPI metadata synchronously
+  if (fmt === 'png') {
+    dataUrl = embedDpiInPng(dataUrl, dpi);
+  }
 
-  const baseName = originalFile
-    ? originalFile.name.replace(/\.[^.]+$/, '')
-    : 'image';
+  const baseName = originalFile ? originalFile.name.replace(/\.[^.]+$/, '') : 'image';
   const filename = `${baseName}_${targetCm}cm_${dpi}dpi${ext}`;
 
   const a = document.createElement('a');
@@ -447,7 +397,79 @@ function doResizeAndDownload(targetCm, dpi) {
   document.body.removeChild(a);
 }
 
-// Reset
+// Synchronous PNG DPI embedding — all done with data URL base64, no async
+function embedDpiInPng(dataUrl, dpi) {
+  // Parse the base64 data from the data URL
+  const base64Data = dataUrl.split(',')[1];
+  const binaryData = atob(base64Data);
+  const arr = new Uint8Array(binaryData.length);
+  for (let i = 0; i < binaryData.length; i++) {
+    arr[i] = binaryData.charCodeAt(i);
+  }
+
+  // Find first IDAT chunk
+  let offset = 8; // skip PNG signature
+  let idatOffset = null;
+
+  while (offset < arr.length - 12) {
+    const length = (arr[offset] << 24) | (arr[offset + 1] << 16) | (arr[offset + 2] << 8) | arr[offset + 3];
+    const type = String.fromCharCode(arr[offset + 4], arr[offset + 5], arr[offset + 6], arr[offset + 7]);
+    if (type === 'IDAT') {
+      idatOffset = offset;
+      break;
+    }
+    offset += 12 + length;
+  }
+
+  if (!idatOffset) return dataUrl; // can't find IDAT, return original
+
+  // Build pHYs chunk (9 bytes: X uint32, Y uint32, unit uint8)
+  const ppu = Math.round(dpi / 0.0254);
+  const phyChunk = new Uint8Array(4 + 4 + 9 + 4); // len + type + data + CRC
+  phyChunk[0] = 0; phyChunk[1] = 0; phyChunk[2] = 0; phyChunk[3] = 9; // length = 9
+  phyChunk[4] = 0x70; phyChunk[5] = 0x48; phyChunk[6] = 0x59; phyChunk[7] = 0x73; // "pHYs"
+  // X (pixels per meter)
+  phyChunk[8] = (ppu >> 24) & 0xff; phyChunk[9] = (ppu >> 16) & 0xff;
+  phyChunk[10] = (ppu >> 8) & 0xff; phyChunk[11] = ppu & 0xff;
+  // Y (pixels per meter)
+  phyChunk[12] = (ppu >> 24) & 0xff; phyChunk[13] = (ppu >> 16) & 0xff;
+  phyChunk[14] = (ppu >> 8) & 0xff; phyChunk[15] = ppu & 0xff;
+  // unit = meter
+  phyChunk[16] = 1;
+  // CRC
+  const crc = calcCRCUint8(phyChunk, 4, 13);
+  phyChunk[17] = ((crc ^ 0xFFFFFFFF) >> 24) & 0xff;
+  phyChunk[18] = ((crc ^ 0xFFFFFFFF) >> 16) & 0xff;
+  phyChunk[19] = ((crc ^ 0xFFFFFFFF) >> 8) & 0xff;
+  phyChunk[20] = (crc ^ 0xFFFFFFFF) & 0xff;
+
+  // Insert pHYs before IDAT
+  const result = new Uint8Array((idatOffset) + phyChunk.length + (arr.length - idatOffset));
+  result.set(arr.slice(0, idatOffset), 0);
+  result.set(phyChunk, idatOffset);
+  result.set(arr.slice(idatOffset), idatOffset + phyChunk.length);
+
+  // Convert back to base64 data URL
+  let binary = '';
+  for (let i = 0; i < result.length; i++) {
+    binary += String.fromCharCode(result[i]);
+  }
+  const newBase64 = btoa(binary);
+  const mimeType = dataUrl.split(':')[1].split(';')[0];
+  return `data:${mimeType};base64,${newBase64}`;
+}
+
+function calcCRCUint8(buf, start, len) {
+  let c = 0xFFFFFFFF;
+  for (let i = start; i < start + len; i++) {
+    c ^= buf[i];
+    for (let j = 0; j < 8; j++) {
+      c = (c >>> 1) ^ (c & 1 ? 0xEDB88320 : 0);
+    }
+  }
+  return c;
+}
+
 resetBtn.addEventListener('click', () => {
   originalImage = null;
   originalFile = null;
@@ -459,7 +481,6 @@ resetBtn.addEventListener('click', () => {
   fileInput.value = '';
 });
 
-// Init
 updateResolution();
 </script>
 
