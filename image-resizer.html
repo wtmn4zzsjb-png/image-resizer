@@ -539,24 +539,18 @@ function doResizeAndDownload(targetCm, dpi) {
     reader.onloadend = () => {
       const buf = new Uint8Array(reader.result);
       // Inject DPI into JFIF APP0 header
-      // JPEG magic: FF D8 FF E0 (APP0 marker)
-      // After FF E0: [len:2] "JFIF\0" [ver:2] [unit:1] [xDensity:2] [yDensity:2] [...]
-      // unit: 0x01 = inches, density = pixels per inch (DPI)
-      const start = buf.indexOf(0xFF, 0); // start of JFIF after SOI
-      // Find FF E0 (APP0)
-      let off = 2; // after FF D8
-      while (off < buf.length - 2) {
+      // JPEG: FF D8 (SOI) FF E0 (APP0) [len:2] JFIF\0 [ver:2] [unit:1] [xDensity:2] [yDensity:2]
+      // Unit: 0x01 = inches, density = pixels per inch
+      let off = 4; // after FF D8, scan for FF E0
+      while (off < buf.length - 5) {
         if (buf[off] === 0xFF && buf[off + 1] === 0xE0) {
-          // Found APP0 at off
-          // Skip FF E0 + 2-byte length + "JFIF\0" + 2-byte version = 9 bytes
-          const headerOff = off + 9;
-          if (headerOff + 5 <= buf.length) {
-            buf[headerOff + 0] = 0x01; // unit = inches
-            buf[headerOff + 1] = (dpi >> 8) & 0xFF;
-            buf[headerOff + 2] = dpi & 0xFF;
-            buf[headerOff + 3] = (dpi >> 8) & 0xFF;
-            buf[headerOff + 4] = dpi & 0xFF;
-          }
+          // APP0 found at off
+          // Unit byte is at off+11, xDensity at off+12, yDensity at off+14
+          buf[off + 11] = 0x01; // unit = inches
+          buf[off + 12] = (dpi >> 8) & 0xFF; // xDensity high
+          buf[off + 13] = dpi & 0xFF;       // xDensity low
+          buf[off + 14] = (dpi >> 8) & 0xFF; // yDensity high
+          buf[off + 15] = dpi & 0xFF;       // yDensity low
           break;
         }
         off++;
