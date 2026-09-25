@@ -534,18 +534,51 @@ function doResizeAndDownload(targetCm, dpi) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(originalImage, 0, 0, targetW, targetH);
 
-  const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+  canvas.toBlob(blob => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const buf = new Uint8Array(reader.result);
+      // Inject DPI into JFIF APP0 header
+      // JPEG magic: FF D8 FF E0 (APP0 marker)
+      // After FF E0: [len:2] "JFIF\0" [ver:2] [unit:1] [xDensity:2] [yDensity:2] [...]
+      // unit: 0x01 = inches, density = pixels per inch (DPI)
+      const start = buf.indexOf(0xFF, 0); // start of JFIF after SOI
+      // Find FF E0 (APP0)
+      let off = 2; // after FF D8
+      while (off < buf.length - 2) {
+        if (buf[off] === 0xFF && buf[off + 1] === 0xE0) {
+          // Found APP0 at off
+          // Skip FF E0 + 2-byte length + "JFIF\0" + 2-byte version = 9 bytes
+          const headerOff = off + 9;
+          if (headerOff + 5 <= buf.length) {
+            buf[headerOff + 0] = 0x01; // unit = inches
+            buf[headerOff + 1] = (dpi >> 8) & 0xFF;
+            buf[headerOff + 2] = dpi & 0xFF;
+            buf[headerOff + 3] = (dpi >> 8) & 0xFF;
+            buf[headerOff + 4] = dpi & 0xFF;
+          }
+          break;
+        }
+        off++;
+      }
 
-  const baseName = originalFile ? originalFile.name.replace(/\.[^.]+$/, '') : 'immagine';
-  const filename = `${baseName}_${targetCm}cm_${dpi}dpi.jpg`;
+      const dpiBlob = new Blob([buf], { type: 'image/jpeg' });
+      const dataUrl = URL.createObjectURL(dpiBlob);
 
-  const a = document.createElement('a');
-  a.href = dataUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  updateWorkflow(3);
+      const baseName = originalFile ? originalFile.name.replace(/\.[^.]+$/, '') : 'immagine';
+      const filename = `${baseName}_${targetCm}cm_${dpi}dpi.jpg`;
+
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(dataUrl);
+      updateWorkflow(3);
+    };
+    reader.readAsArrayBuffer(blob);
+  }, 'image/jpeg', 1.0);
 }
 
 resetBtn.addEventListener('click', () => {
