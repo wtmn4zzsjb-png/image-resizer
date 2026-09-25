@@ -538,28 +538,20 @@ function doResizeAndDownload(targetCm, dpi) {
     const reader = new FileReader();
     reader.onloadend = () => {
       const buf = new Uint8Array(reader.result);
-      // Inject DPI into JFIF APP0 header
-      // JPEG magic: FF D8 FF E0 (APP0 marker)
-      // After FF E0: [len:2] "JFIF\0" [ver:2] [unit:1] [xDensity:2] [yDensity:2] [...]
-      // unit: 0x01 = inches, density = pixels per inch (DPI)
-      const start = buf.indexOf(0xFF, 0); // start of JFIF after SOI
-      // Find FF E0 (APP0)
-      let off = 2; // after FF D8
-      while (off < buf.length - 2) {
-        if (buf[off] === 0xFF && buf[off + 1] === 0xE0) {
-          // Found APP0 at off
-          // Skip FF E0 + len + "JFIF\0" + version (9 bytes), then unit at +2
-          const unitOff = off + 11;
-          if (unitOff + 4 <= buf.length) {
-            buf[unitOff + 0] = 0x01; // unit = inches
-            buf[unitOff + 1] = (dpi >> 8) & 0xFF; // xDensity high
-            buf[unitOff + 2] = dpi & 0xFF; // xDensity low
-            buf[unitOff + 3] = (dpi >> 8) & 0xFF; // yDensity high
-            buf[unitOff + 4] = dpi & 0xFF; // yDensity low
-          }
-          break;
+      // Inject DPI into JFIF APP0 header (fixed offsets — canvas.toBlob always produces JFIF at byte 2)
+      // JPEG: FF D8 [SOI] FF E0 [APP0] len "JFIF\0" ver unit xDens yDens
+      // Byte offsets from file start:
+      //   0-1: FF D8 (SOI), 2-3: FF E0 (APP0), 4-5: length, 6-10: "JFIF\0"
+      //   11-12: version, 13: unit, 14-15: xDensity, 16-17: yDensity
+      const kJFIFMarker = 0x4A46494600; // "JFIF " check at offset 6
+      if (buf.length >= 18 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF && buf[3] === 0xE0) {
+        if (buf[6] === 0x4A && buf[7] === 0x46 && buf[8] === 0x49 && buf[9] === 0x46 && buf[10] === 0x00) {
+          buf[13] = 0x01; // unit = inches
+          buf[14] = (dpi >> 8) & 0xFF; // xDensity high
+          buf[15] = dpi & 0xFF; // xDensity low
+          buf[16] = (dpi >> 8) & 0xFF; // yDensity high
+          buf[17] = dpi & 0xFF; // yDensity low
         }
-        off++;
       }
 
       const dpiBlob = new Blob([buf], { type: 'image/jpeg' });
